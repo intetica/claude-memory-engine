@@ -1,0 +1,45 @@
+{
+  "name": "claude-memory-engine",
+  "version": "0.1.0",
+  "description": "Persistent project memory for Claude Code: hybrid keyword+semantic search over your past actions, decisions, and patterns. Auto-captures every Edit/Write/Bash; surfaces relevant context at session start.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/intetica/claude-memory-engine"
+  },
+  "scripts": {
+    "mcp:build": "tsc --project scripts/tsconfig.json",
+    "mcp:server": "node dist-scripts/scripts/mcp-memory-server.js",
+    "memory:queue-consumer": "bash scripts/wiki/queue-consumer.sh",
+    "memory:queue-consumer:once": "bash scripts/wiki/queue-consumer.sh --once",
+    "memory:embedding-worker": "bash scripts/wiki/embedding-worker.sh",
+    "memory:embedding-worker:once": "bash scripts/wiki/embedding-worker.sh --once",
+    "memory:query": "bash scripts/wiki/query.sh",
+    "memory:status": "bash scripts/wiki/update-status.sh",
+    "memory:compile": "bash scripts/wiki/compile.sh",
+    "memory:lint": "bash scripts/wiki/lint.sh",
+    "memory:migrate": "bash scripts/wiki/migrate-memory-to-db.sh",
+    "memory:migrate:dry": "bash scripts/wiki/migrate-memory-to-db.sh --dry-run",
+    "setup": "bash setup.sh",
+    "verify": "bash scripts/verify-install.sh",
+    "vitest": "vitest run",
+    "vitest:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "pg": "^8.20.0",
+    "voyageai": "^0.2.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0",
+    "@vitest/ui": "^4.1.5",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

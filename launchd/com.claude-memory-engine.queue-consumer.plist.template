@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claude-memory-engine.queue-consumer.{{PROJECT}}</string>
+
+  <key>WorkingDirectory</key>
+  <string>{{PROJECT_DIR}}</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>{{NODE_BIN_DIR}}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</string>
+  </dict>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{NODE_BIN_DIR}}/npm</string>
+    <string>run</string>
+    <string>memory:queue-consumer</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>{{PROJECT_DIR}}/scripts/wiki/queue-consumer.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>{{PROJECT_DIR}}/scripts/wiki/queue-consumer.log</string>
+</dict>
+</plist>

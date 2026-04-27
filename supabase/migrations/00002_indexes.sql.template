@@ -1,0 +1,51 @@
+-- 20260425_002_{{SCHEMA}}_indexes.sql
+-- Memory Engine: HNSW + GIN + btree indexes (13 total)
+-- Depends on: 20260425_001_{{SCHEMA}}_schema.sql
+
+-- HNSW для pgvector (semantic search, m=16 default OK для 1k-100k records)
+CREATE INDEX idx_observations_embedding_hnsw
+ON {{SCHEMA}}.observations
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 128)
+WHERE embedding IS NOT NULL;
+
+-- GIN для tsvector (Russian full-text search)
+CREATE INDEX idx_observations_search_vector_gin
+ON {{SCHEMA}}.observations
+USING gin (search_vector);
+
+-- UNIQUE для дедупликации в окне 1 минуты
+-- created_at_epoch / 60000 = minute bucket (BIGINT immutable, в отличие от date_trunc на TIMESTAMPTZ)
+CREATE UNIQUE INDEX idx_observations_content_hash_unique
+ON {{SCHEMA}}.observations (content_hash, project, (created_at_epoch / 60000));
+
+-- btree для временных запросов
+CREATE INDEX idx_observations_project_created
+ON {{SCHEMA}}.observations (project, created_at_epoch DESC);
+
+CREATE INDEX idx_observations_project_type_created
+ON {{SCHEMA}}.observations (project, type, created_at_epoch DESC);
+
+-- summaries
+CREATE INDEX idx_summaries_session_id ON {{SCHEMA}}.summaries (session_id);
+CREATE INDEX idx_summaries_project_created ON {{SCHEMA}}.summaries (project, created_at DESC);
+
+-- sessions
+CREATE INDEX idx_sessions_project_started ON {{SCHEMA}}.sessions (project, started_at DESC);
+CREATE INDEX idx_sessions_status ON {{SCHEMA}}.sessions (status, started_at DESC);
+
+-- pending_messages (queue)
+CREATE INDEX idx_pending_messages_status_created
+ON {{SCHEMA}}.pending_messages (status, created_at_epoch DESC)
+WHERE status IN ('pending', 'processing');
+
+CREATE INDEX idx_pending_messages_stale
+ON {{SCHEMA}}.pending_messages (started_processing_at_epoch)
+WHERE status = 'processing';
+
+-- observation_feedback
+CREATE INDEX idx_observation_feedback_observation_id
+ON {{SCHEMA}}.observation_feedback (observation_id, created_at_epoch DESC);
+
+CREATE INDEX idx_observation_feedback_signal
+ON {{SCHEMA}}.observation_feedback (signal, created_at_epoch DESC);

@@ -1,0 +1,28 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Generated MCP config (contains secrets in `env:`)
+.mcp.json
+
+# Build artifacts
+dist-scripts/
+node_modules/
+
+# Local working state
+wiki/queue/
+wiki/queue/.processing/
+wiki/queue/.deadletter/
+wiki/state.json
+scripts/wiki/queue-consumer.log
+scripts/wiki/embedding-worker.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Personal artifacts not meant for the public repo
+docs/social-posts.md

@@ -1,0 +1,49 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start-memory.sh",
+						"timeout": 15
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write|Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/wiki/posttooluse-capture.sh",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"PreCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-compact-memory.sh",
+						"timeout": 60
+					}
+				]
+			}
+		],
+		"SessionEnd": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-end-memory.sh",
+						"timeout": 60
+					}
+				]
+			}
+		]
+	}
+}

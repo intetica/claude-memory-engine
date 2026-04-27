@@ -1,0 +1,17 @@
+[Unit]
+Description=Claude Memory Engine — queue consumer ({{PROJECT}})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory={{PROJECT_DIR}}
+Environment="PATH={{NODE_BIN_DIR}}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart={{NODE_BIN_DIR}}/npm run memory:queue-consumer
+Restart=always
+RestartSec=5
+StandardOutput=append:{{PROJECT_DIR}}/scripts/wiki/queue-consumer.log
+StandardError=append:{{PROJECT_DIR}}/scripts/wiki/queue-consumer.log
+
+[Install]
+WantedBy=default.target

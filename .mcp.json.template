@@ -1,0 +1,9 @@
+{
+	"mcpServers": {
+		"{{SERVER_NAME}}": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["dist-scripts/scripts/mcp-memory-server.js"]
+		}
+	}
+}

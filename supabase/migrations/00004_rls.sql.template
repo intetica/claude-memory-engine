@@ -1,0 +1,32 @@
+-- 20260425_004_{{SCHEMA}}_rls.sql
+-- Memory Engine: RLS — service_role full access, anon explicit deny
+
+ALTER TABLE {{SCHEMA}}.observations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY observations_service_role_all ON {{SCHEMA}}.observations
+  FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY observations_deny_anon ON {{SCHEMA}}.observations
+  FOR ALL USING (FALSE) WITH CHECK (FALSE);
+
+ALTER TABLE {{SCHEMA}}.summaries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY summaries_service_role_all ON {{SCHEMA}}.summaries
+  FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY summaries_deny_anon ON {{SCHEMA}}.summaries
+  FOR ALL USING (FALSE) WITH CHECK (FALSE);
+
+ALTER TABLE {{SCHEMA}}.sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sessions_service_role_all ON {{SCHEMA}}.sessions
+  FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY sessions_deny_anon ON {{SCHEMA}}.sessions
+  FOR ALL USING (FALSE) WITH CHECK (FALSE);
+
+ALTER TABLE {{SCHEMA}}.pending_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY pending_messages_service_role_all ON {{SCHEMA}}.pending_messages
+  FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY pending_messages_deny_anon ON {{SCHEMA}}.pending_messages
+  FOR ALL USING (FALSE) WITH CHECK (FALSE);
+
+ALTER TABLE {{SCHEMA}}.observation_feedback ENABLE ROW LEVEL SECURITY;
+CREATE POLICY observation_feedback_service_role_all ON {{SCHEMA}}.observation_feedback
+  FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY observation_feedback_deny_anon ON {{SCHEMA}}.observation_feedback
+  FOR ALL USING (FALSE) WITH CHECK (FALSE);

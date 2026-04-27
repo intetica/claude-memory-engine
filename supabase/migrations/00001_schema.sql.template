@@ -1,0 +1,115 @@
+-- 20260425_001_{{SCHEMA}}_schema.sql
+-- Memory Engine: Schema, tables, tsvector setup
+-- Applied as 2 migrations: 001a (setup) + 001b (tables)
+-- Note: search_vector via TRIGGER (not GENERATED) — to_tsvector with custom config not immutable
+
+-- ============================================================
+-- Part A: Schema + extensions + russian_unaccent ts config
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS {{SCHEMA}};
+
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS vector;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_ts_config WHERE cfgname = 'russian_unaccent') THEN
+    CREATE TEXT SEARCH CONFIGURATION russian_unaccent (COPY = russian);
+    ALTER TEXT SEARCH CONFIGURATION russian_unaccent
+      ALTER MAPPING FOR word, hword, hword_part WITH unaccent, russian_stem;
+  END IF;
+END $$;
+
+-- ============================================================
+-- Part B: Tables (5)
+-- ============================================================
+
+CREATE TABLE {{SCHEMA}}.observations (
+  id BIGSERIAL PRIMARY KEY,
+  project TEXT NOT NULL DEFAULT '{{PROJECT}}',
+  session_id TEXT,
+  type TEXT NOT NULL CHECK (type IN (
+    'decision', 'bugfix', 'feature', 'refactor',
+    'discovery', 'change', 'security_alert', 'security_note'
+  )),
+  title TEXT NOT NULL,
+  subtitle TEXT,
+  narrative TEXT NOT NULL,
+  facts TEXT[] DEFAULT '{}',
+  concepts TEXT[] DEFAULT '{}',
+  files_read TEXT[] DEFAULT '{}',
+  files_modified TEXT[] DEFAULT '{}',
+  content_hash TEXT NOT NULL,
+  embedding VECTOR(1024),
+  embedding_model TEXT,
+  search_vector TSVECTOR,
+  prompt_number INTEGER,
+  discovery_tokens INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at_epoch BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+  CONSTRAINT content_hash_length CHECK (length(content_hash) = 24),
+  CONSTRAINT title_not_empty CHECK (length(title) > 2),
+  CONSTRAINT narrative_not_empty CHECK (length(narrative) > 10)
+);
+
+-- TRIGGER for search_vector (GENERATED ALWAYS не работает с custom ts config)
+CREATE OR REPLACE FUNCTION {{SCHEMA}}.observations_update_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('russian_unaccent', coalesce(NEW.title, '')), 'A') ||
+    setweight(to_tsvector('russian_unaccent', coalesce(NEW.narrative, '')), 'B') ||
+    setweight(to_tsvector('russian_unaccent', coalesce(array_to_string(NEW.facts, ' '), '')), 'C');
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER observations_search_vector_update
+BEFORE INSERT OR UPDATE OF title, narrative, facts ON {{SCHEMA}}.observations
+FOR EACH ROW EXECUTE FUNCTION {{SCHEMA}}.observations_update_search_vector();
+
+COMMENT ON TABLE {{SCHEMA}}.observations IS 'Atomic observations from tool events';
+COMMENT ON COLUMN {{SCHEMA}}.observations.content_hash IS 'SHA256[:24] of session+title+narrative';
+
+CREATE TABLE {{SCHEMA}}.summaries (
+  id BIGSERIAL PRIMARY KEY,
+  session_id TEXT NOT NULL UNIQUE,
+  memory_session_id TEXT,
+  project TEXT NOT NULL DEFAULT '{{PROJECT}}',
+  request TEXT,
+  investigated TEXT,
+  learned TEXT,
+  completed TEXT,
+  next_steps TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE {{SCHEMA}}.sessions (
+  id TEXT PRIMARY KEY,
+  memory_session_id TEXT,
+  project TEXT NOT NULL DEFAULT '{{PROJECT}}',
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'abandoned')),
+  prompt_count INTEGER DEFAULT 0,
+  observation_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE {{SCHEMA}}.pending_messages (
+  id BIGSERIAL PRIMARY KEY,
+  session_id TEXT,
+  message_type TEXT NOT NULL CHECK (message_type IN ('observation', 'summarize')),
+  payload JSONB NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'processed', 'failed')),
+  retry_count INTEGER DEFAULT 0,
+  created_at_epoch BIGINT NOT NULL,
+  started_processing_at_epoch BIGINT,
+  error_message TEXT
+);
+
+CREATE TABLE {{SCHEMA}}.observation_feedback (
+  id BIGSERIAL PRIMARY KEY,
+  observation_id BIGINT NOT NULL REFERENCES {{SCHEMA}}.observations(id) ON DELETE CASCADE,
+  signal TEXT NOT NULL CHECK (signal IN ('mcp_search', 'mcp_timeline', 'mcp_get_details', 'manual_read')),
+  created_at_epoch BIGINT NOT NULL
+);

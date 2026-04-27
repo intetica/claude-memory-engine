@@ -1,0 +1,17 @@
+[Unit]
+Description=Claude Memory Engine — embedding worker ({{PROJECT}})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory={{PROJECT_DIR}}
+Environment="PATH={{NODE_BIN_DIR}}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart={{NODE_BIN_DIR}}/npm run memory:embedding-worker
+Restart=always
+RestartSec=10
+StandardOutput=append:{{PROJECT_DIR}}/scripts/wiki/embedding-worker.log
+StandardError=append:{{PROJECT_DIR}}/scripts/wiki/embedding-worker.log
+
+[Install]
+WantedBy=default.target

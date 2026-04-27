@@ -1,0 +1,90 @@
+-- 20260425_003_{{SCHEMA}}_hybrid_search.sql
+-- Memory Engine: Hybrid search (RRF k=60) + Timeline + Health metrics
+
+CREATE OR REPLACE FUNCTION {{SCHEMA}}.hybrid_search_observations(
+  p_query_text TEXT,
+  p_query_embedding VECTOR(1024) DEFAULT NULL,
+  p_project TEXT DEFAULT '{{PROJECT}}',
+  p_type TEXT DEFAULT NULL,
+  p_limit INT DEFAULT 20
+)
+RETURNS TABLE (
+  id BIGINT, title TEXT, type TEXT, narrative TEXT,
+  created_at TIMESTAMPTZ, rrf_score NUMERIC,
+  semantic_rank INT, keyword_rank INT
+)
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = {{SCHEMA}}, public
+AS $$
+  WITH semantic AS (
+    SELECT o.id, o.title, o.type, SUBSTRING(o.narrative, 1, 200) AS narrative,
+           o.created_at,
+           ROW_NUMBER() OVER (ORDER BY o.embedding <=> p_query_embedding)::INT AS s_rank
+    FROM {{SCHEMA}}.observations o
+    WHERE o.embedding IS NOT NULL
+      AND o.project = p_project
+      AND (p_type IS NULL OR o.type = p_type)
+      AND p_query_embedding IS NOT NULL
+    ORDER BY o.embedding <=> p_query_embedding
+    LIMIT p_limit * 3
+  ),
+  keyword AS (
+    SELECT o.id, o.title, o.type, SUBSTRING(o.narrative, 1, 200) AS narrative,
+           o.created_at,
+           ROW_NUMBER() OVER (ORDER BY ts_rank(o.search_vector, plainto_tsquery('russian_unaccent', p_query_text)) DESC)::INT AS k_rank
+    FROM {{SCHEMA}}.observations o
+    WHERE o.search_vector @@ plainto_tsquery('russian_unaccent', p_query_text)
+      AND o.project = p_project
+      AND (p_type IS NULL OR o.type = p_type)
+    ORDER BY ts_rank(o.search_vector, plainto_tsquery('russian_unaccent', p_query_text)) DESC
+    LIMIT p_limit * 3
+  ),
+  rrf AS (
+    SELECT
+      COALESCE(s.id, k.id) AS id,
+      COALESCE(s.title, k.title) AS title,
+      COALESCE(s.type, k.type) AS type,
+      COALESCE(s.narrative, k.narrative) AS narrative,
+      COALESCE(s.created_at, k.created_at) AS created_at,
+      (COALESCE(1.0 / (60 + s.s_rank), 0) + COALESCE(1.0 / (60 + k.k_rank), 0))::NUMERIC AS rrf_score,
+      s.s_rank AS semantic_rank,
+      k.k_rank AS keyword_rank
+    FROM semantic s
+    FULL OUTER JOIN keyword k ON s.id = k.id
+  )
+  SELECT * FROM rrf
+  ORDER BY rrf_score DESC, created_at DESC
+  LIMIT p_limit;
+$$;
+
+CREATE OR REPLACE FUNCTION {{SCHEMA}}.timeline_observations(
+  p_anchor_id BIGINT,
+  p_depth_before INT DEFAULT 3,
+  p_depth_after INT DEFAULT 3,
+  p_project TEXT DEFAULT '{{PROJECT}}'
+)
+RETURNS TABLE (id BIGINT, title TEXT, type TEXT, created_at TIMESTAMPTZ, is_anchor BOOLEAN)
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = {{SCHEMA}}, public
+AS $$
+  WITH anchor AS (
+    SELECT created_at FROM {{SCHEMA}}.observations WHERE id = p_anchor_id AND project = p_project
+  )
+  SELECT o.id, o.title, o.type, o.created_at, (o.id = p_anchor_id)::BOOLEAN
+  FROM {{SCHEMA}}.observations o, anchor a
+  WHERE o.project = p_project
+    AND o.created_at BETWEEN a.created_at - INTERVAL '1 day' * p_depth_before
+                         AND a.created_at + INTERVAL '1 day' * p_depth_after
+  ORDER BY o.created_at DESC;
+$$;
+
+CREATE OR REPLACE VIEW {{SCHEMA}}.health_metrics AS
+SELECT
+  (SELECT COUNT(*) FROM {{SCHEMA}}.observations) AS observations_total,
+  (SELECT COUNT(*) FROM {{SCHEMA}}.observations WHERE created_at >= NOW() - INTERVAL '7 days') AS observations_last_7d,
+  (SELECT COUNT(*) FROM {{SCHEMA}}.observations WHERE created_at >= NOW() - INTERVAL '1 day') AS observations_last_24h,
+  ROUND(100.0 * (SELECT COUNT(DISTINCT observation_id) FROM {{SCHEMA}}.observation_feedback)::NUMERIC
+       / NULLIF((SELECT COUNT(*) FROM {{SCHEMA}}.observations), 0), 1) AS feedback_used_pct,
+  ROUND((SELECT AVG(LENGTH(narrative)) FROM {{SCHEMA}}.observations))::INT AS avg_observation_size_chars,
+  (SELECT COUNT(*) FROM {{SCHEMA}}.sessions WHERE started_at >= NOW() - INTERVAL '7 days') AS sessions_last_7d,
+  (SELECT COUNT(*) FROM {{SCHEMA}}.pending_messages WHERE status IN ('pending', 'processing')) AS pending_messages_count;

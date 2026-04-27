@@ -1,0 +1,27 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"lib": ["ES2022"],
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"sourceMap": false,
+		"declaration": false,
+		"outDir": "../dist-scripts",
+		"rootDir": "..",
+		"forceConsistentCasingInFileNames": true,
+		"types": ["node"]
+	},
+	"include": [
+		"./mcp-memory-server.ts",
+		"./wiki/types.ts",
+		"./wiki/zod-schemas.ts",
+		"./wiki/embedding-worker.ts",
+		"./wiki/queue-consumer/extractor.ts",
+		"./wiki/queue-consumer/sanitizer.ts"
+	],
+	"exclude": ["node_modules"]
+}
